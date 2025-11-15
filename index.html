@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Crypto Tracker (Binance API Working)</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+body { background:#0f172a; color:white; font-family:Arial; padding:20px; }
+.card { background:#1e293b; padding:15px; border-radius:10px; width:260px; }
+.green { color:#4ade80; font-weight:bold; }
+.red { color:#f87171; font-weight:bold; }
+</style>
+</head>
+<body>
+
+<h2>Real-Time Cryptocurrency Price Tracker</h2>
+
+<select id="coin">
+  <option value="BTCUSDT">Bitcoin (BTC)</option>
+  <option value="ETHUSDT">Ethereum (ETH)</option>
+  <option value="DOGEUSDT">Dogecoin (DOGE)</option>
+  <option value="SOLUSDT">Solana (SOL)</option>
+  <option value="LTCUSDT">Litecoin (LTC)</option>
+</select>
+
+<button onclick="updateData()">Refresh</button>
+
+<div class="card" style="margin-top:20px;">
+  <h3>Current Price</h3>
+  <div id="price" style="font-size:22px;">Loading...</div>
+  <div id="change"></div>
+  <br>
+  <strong>24h High:</strong> <span id="high"></span><br>
+  <strong>24h Low:</strong> <span id="low"></span><br>
+  <strong>Last Updated:</strong> <span id="time"></span>
+</div>
+
+<canvas id="chart" height="120"></canvas>
+
+<script>
+let chart;
+
+// Initialize Chart
+function initChart() {
+  const ctx = document.getElementById("chart").getContext("2d");
+  chart = new Chart(ctx, {
+    type: "line",
+    data: { labels: [], datasets: [{
+      label: "Price (USD)",
+      data: [],
+      borderColor: "#3b82f6",
+      borderWidth: 2,
+      fill: false,
+      pointRadius: 0
+    }]},
+    options: {
+      scales: {
+        x: { ticks: { color: "white" }},
+        y: { ticks: { color: "white" }}
+      }
+    }
+  });
+}
+
+// Fetch current price
+async function fetchPrice(symbol) {
+  const r = await fetch(`https://api.binance.com/api/v3/ticker/24hr?symbol=${symbol}`);
+  return await r.json();
+}
+
+// Fetch chart data (last 60 mins)
+async function fetchChart(symbol) {
+  const r = await fetch(`https://api.binance.com/api/v3/klines?symbol=${symbol}&interval=1m&limit=60`);
+  return await r.json();
+}
+
+// Update UI
+async function updateData() {
+  let symbol = document.getElementById("coin").value;
+
+  try {
+    // Get live price
+    const data = await fetchPrice(symbol);
+
+    const price = parseFloat(data.lastPrice);
+    const high = parseFloat(data.highPrice);
+    const low = parseFloat(data.lowPrice);
+    const pct = parseFloat(data.priceChangePercent);
+
+    document.getElementById("price").textContent = "$ " + price;
+    document.getElementById("high").textContent = high;
+    document.getElementById("low").textContent = low;
+    document.getElementById("time").textContent = new Date().toLocaleTimeString();
+
+    // Color-coded change %
+    if (pct >= 0) {
+      document.getElementById("change").innerHTML = `<span class='green'>+${pct}%</span>`;
+    } else {
+      document.getElementById("change").innerHTML = `<span class='red'>${pct}%</span>`;
+    }
+
+    // Get chart data
+    let c = await fetchChart(symbol);
+
+    const labels = c.map(item => new Date(item[0]).toLocaleTimeString([], { hour:"2-digit", minute:"2-digit" }));
+    const prices = c.map(item => parseFloat(item[4]));
+
+    chart.data.labels = labels;
+    chart.data.datasets[0].data = prices;
+    chart.update();
+
+  } catch (err) {
+    document.getElementById("price").textContent = "Error fetching data";
+  }
+}
+
+initChart();
+updateData();
+setInterval(updateData, 5000);
+</script>
+
+</body>
+</html>
